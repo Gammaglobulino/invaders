@@ -8,6 +8,10 @@ use crossterm::event;
 use crate::terminal::{EnterAlternateScreen,LeaveAlternateScreen};
 use crossterm::cursor::{Hide,Show};
 use std::time::Duration;
+use std::sync::mpsc;
+use std::thread;
+use invaders::frame;
+use invaders::render;
 
 fn main() -> Result<(),Box<dyn Error>>{
     let mut audio=Audio::new();
@@ -25,8 +29,27 @@ fn main() -> Result<(),Box<dyn Error>>{
     stdout.execute(EnterAlternateScreen)?;
     stdout.execute(Hide)?;
 
+    //Render loop in a separate thread
+
+    let (render_tx,render_rx) =mpsc::channel();
+    let render_handle=thread::spawn(move || {
+       let mut last_frame=frame::new_frame();
+       let mut stdout=io::stdout(); 
+       render::render(&mut stdout, &last_frame, &last_frame, true);
+       loop{
+           let cur_frame=match render_rx.recv(){
+               Ok(x) => x,
+               Err(_) => break,
+           };
+           render::render(&mut stdout, &last_frame, &cur_frame, false);
+           last_frame=cur_frame;
+       }
+    });
+
     // Game Lopp
     'gameloop: loop{
+        // Per-frame init
+        let cur_frame=frame::new_frame();
         //input
         while event::poll(Duration::default())?{
             
@@ -41,9 +64,16 @@ fn main() -> Result<(),Box<dyn Error>>{
 
             }
         }
+        // Draw & render
+        let _ = render_tx.send(cur_frame);
+        thread::sleep(Duration::from_micros(1));
     }
 
     //Cleanup
+
+    drop(render_tx);
+    render_handle.join().unwrap();
+    
     audio.wait();
     stdout.execute(Show)?;
     stdout.execute(LeaveAlternateScreen)?;
