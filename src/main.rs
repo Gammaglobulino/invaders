@@ -12,6 +12,8 @@ use std::sync::mpsc;
 use std::thread;
 use invaders::frame;
 use invaders::render;
+use invaders::player::Player;
+use invaders::frame::Drawable;
 
 fn main() -> Result<(),Box<dyn Error>>{
     let mut audio=Audio::new();
@@ -47,9 +49,11 @@ fn main() -> Result<(),Box<dyn Error>>{
     });
 
     // Game Lopp
+    let mut player=Player::new();
+
     'gameloop: loop{
         // Per-frame init
-        let cur_frame=frame::new_frame();
+        let mut cur_frame=frame::new_frame();
         //input
         while event::poll(Duration::default())?{
             
@@ -59,12 +63,15 @@ fn main() -> Result<(),Box<dyn Error>>{
                         audio.play("lose");
                         break 'gameloop;
                     }
+                    KeyCode::Left => player.move_left(),
+                    KeyCode::Right => player.move_right(),
                     _=> {}
                 }
 
             }
         }
         // Draw & render
+        player.draw(&mut cur_frame);
         let _ = render_tx.send(cur_frame);
         thread::sleep(Duration::from_micros(1));
     }
@@ -73,12 +80,11 @@ fn main() -> Result<(),Box<dyn Error>>{
 
     drop(render_tx);
     render_handle.join().unwrap();
-    
+
     audio.wait();
     stdout.execute(Show)?;
     stdout.execute(LeaveAlternateScreen)?;
     terminal::disable_raw_mode()?;
-
     
     Ok(())
 }
