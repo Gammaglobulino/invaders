@@ -1,3 +1,6 @@
+use invaders::player::Player;
+use invaders::invaders::Invaders;
+use invaders::render;
 use rusty_audio::Audio;
 use std::error::Error;
 use std::io;
@@ -7,13 +10,13 @@ use crossterm::event::{Event,KeyCode};
 use crossterm::event;
 use crate::terminal::{EnterAlternateScreen,LeaveAlternateScreen};
 use crossterm::cursor::{Hide,Show};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::sync::mpsc;
 use std::thread;
 use invaders::frame;
-use invaders::render;
-use invaders::player::Player;
 use invaders::frame::Drawable;
+
+
 
 fn main() -> Result<(),Box<dyn Error>>{
     let mut audio=Audio::new();
@@ -39,6 +42,7 @@ fn main() -> Result<(),Box<dyn Error>>{
        let mut stdout=io::stdout(); 
        render::render(&mut stdout, &last_frame, &last_frame, true);
        loop{
+           
            let cur_frame=match render_rx.recv(){
                Ok(x) => x,
                Err(_) => break,
@@ -50,9 +54,13 @@ fn main() -> Result<(),Box<dyn Error>>{
 
     // Game Lopp
     let mut player=Player::new();
+    let mut instant = Instant::now();
+    let mut invaders = Invaders::new();
 
     'gameloop: loop{
         // Per-frame init
+        let delta=instant.elapsed();
+        instant=Instant::now();
         let mut cur_frame=frame::new_frame();
         //input
         while event::poll(Duration::default())?{
@@ -65,13 +73,28 @@ fn main() -> Result<(),Box<dyn Error>>{
                     }
                     KeyCode::Left => player.move_left(),
                     KeyCode::Right => player.move_right(),
+                    KeyCode::Char(' ') | KeyCode::Enter =>{
+                        if player.shoot(){
+                            audio.play("pew");
+                        }
+                    }
                     _=> {}
                 }
 
             }
         }
+        // game updates
+        player.update(delta);
+        if invaders.update(delta){
+            audio.play("move");
+        }
+
         // Draw & render
-        player.draw(&mut cur_frame);
+        let drawables:Vec<&dyn Drawable> =vec![&player,&invaders];
+        for drawable in drawables{
+            drawable.draw(&mut cur_frame);
+        }
+
         let _ = render_tx.send(cur_frame);
         thread::sleep(Duration::from_micros(1));
     }
