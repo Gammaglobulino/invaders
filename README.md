@@ -1,5 +1,5 @@
-# invaders
-This is the popular arcade game built using Rust
+# Invaders Game
+This is the popular arcade game built using Rust.
 
 
 Enjoy
