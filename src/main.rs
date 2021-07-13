@@ -52,7 +52,7 @@ fn main() -> Result<(),Box<dyn Error>>{
        }
     });
 
-    // Game Lopp
+    // Game Loop
     let mut player=Player::new();
     let mut instant = Instant::now();
     let mut invaders = Invaders::new();
